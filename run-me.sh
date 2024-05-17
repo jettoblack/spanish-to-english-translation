@@ -1,12 +1,12 @@
-#!/bin/bash -v
+#!/bin/bash
 
 MARIAN=../../build
 
 # if we are in WSL, we need to add '.exe' to the tool names
-if [ -e "/bin/wslpath" ]
-then
-    EXT=.exe
-fi
+#if [ -e "/bin/wslpath" ]
+#then
+#    EXT=.exe
+#fi
 
 MARIAN_TRAIN=$MARIAN/marian$EXT
 MARIAN_DECODER=$MARIAN/marian-decoder$EXT
@@ -49,7 +49,7 @@ fi
 # train model
 if [ ! -e "model/model.npz.best-translation.npz" ]
 then
-    $MARIAN_TRAIN \
+#    $MARIAN_TRAIN \
         --devices $GPUS \
         --type amun \
         --model model/model.npz \
@@ -67,6 +67,31 @@ then
         --overwrite --keep-best \
         --seed 1111 --exponential-smoothing \
         --normalize=1 --beam-size=12 --quiet-translation
+	$MARIAN_TRAIN \
+        --model model/model.npz --type transformer \
+        --train-sets data/corpus.bpe.es data/corpus.bpe.en \
+        --max-length 100 \
+        --vocabs model/vocab.es.yml model/vocab.en.yml \
+        --mini-batch-fit -w 10000 --maxi-batch 1000 \
+        --early-stopping 10 --cost-type=ce-mean-words \
+        --valid-freq 5000 --save-freq 5000 --disp-freq 500 \
+        --valid-metrics ce-mean-words perplexity translation \
+        --valid-sets data/corpus-dev.bpe.es data/corpus-dev.bpe.en \
+        --valid-script-path "bash ./scripts/validate.sh" \
+        --valid-translation-output data/valid.bpe.en.output \
+        --valid-mini-batch 64 \
+        --beam-size 6 --normalize 0.6 \
+        --log model/train.log --valid-log model/valid.log \
+        --enc-depth 6 --dec-depth 6 \
+        --transformer-heads 8 \
+        --transformer-postprocess-emb d \
+        --transformer-postprocess dan \
+        --transformer-dropout 0.1 --label-smoothing 0.1 \
+        --learn-rate 0.0003 --lr-warmup 16000 --lr-decay-inv-sqrt 16000 --lr-report \
+        --optimizer-params 0.9 0.98 1e-09 --clip-norm 5 \
+        --tied-embeddings-all \
+        --devices $GPUS --sync-sgd --seed 1111 \
+        --exponential-smoothing
 fi
 
 # translate dev set
